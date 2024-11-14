@@ -24,19 +24,20 @@ def expert(query: str):
         content.append(r['content'])
     return "\n".join(content)
 
-@tool("update_requirements")
-def update_requirements():
-    """Makes a list of requirements for the product user is looking for, based on your conversation history with the user."""
-    return "updated"
+# @tool("update_requirements")
+# def update_requirements():
+#     """Makes a list of requirements for the product user is looking for, based on your conversation history with the user."""
+#     return "updated"
 
 @tool("find_products")
 def find_products():
-    """Finds the potential products from the world web/internet using Google search. that meets the user requirements"""
+    """Makes a list of requirements for the product user is looking for, based on your conversation history with the user.
+    Then, Finds the potential products from the world web/internet using Google search. that meets the user requirements"""
     return "found"
 
 tools = {
     "expert": expert,
-    "update_requirements": update_requirements,
+    # "update_requirements": update_requirements,
     "find_products": find_products
 }
 
@@ -57,11 +58,14 @@ class Agent:
         self.orchestrator_system_prompt = """
         You are a software and AI products consultant, you have to search, find and suggest the most appropriate product for the user based on their requirements.
         This is your standard operating procedure you have to follow the steps mentioned below in loop again and again:
-        1. First, always try to understand what user is looking for and get a list of his requirements. Use the "update_requirements" tool to collect the requirements based on your conversation history with the user. Make sure to call this tool again and again when ever user talks about his requriements.
-        2. If you feel like you have collected a substancial amount of requirements from the user, Use the "find_products" tool to get a list of tools from the internet that meets the collected requirements. Then group these products and give them a highlevel picture of what sought of groups are available according to his requirement and based on the diversity of capabilites of these products ask for more requirements from the user. to help us drilldown on to the exact requirements and to filter out these products.
+        1. First, always try to understand what user is looking for and get a list of his requirements. 
+        2. Soon, Use the "find_products" tool to get a list of tools from the internet that meets the collected requirements. 
+        Then group these products and give them a highlevel picture of what sought of groups are available according to his requirement and based on the diversity of capabilites of these products ask for more requirements from the user. to help us drilldown on to the exact requirements and to filter out these products.
+        Retrived cadidates are shown to the user on the UI. So its redudent to talk about the products in detail.
         3. And repeat.
 
-       Along the way, at anypoint if you are not sure and looking from some knowledge/context or some specific information you can use the "expert" tool by asking it a query to get the most factual, updated knowledge from the internet.
+       Along the way, at anypoint if you are not sure and looking from some knowledge/context (but not looking/suggesting/finding products) or some specific information you can use the "expert" tool by asking it a query to get the most factual, updated knowledge from the internet.
+       Always use "find_products" tool only if you are suggesting a list of products/tools to the user. Never answer directly with a list of products/tools.
 
         Keep it conversational and friendly. Do the above steps in multiple turns until the user gives up.
         """
@@ -74,12 +78,12 @@ class Agent:
         graph.add_node("update_requirements", self.update_requirements)
         graph.add_node("find_products", self.find_products)
 
-        graph.add_conditional_edges("orchestrator", self.to_update_requirements, {True: "update_requirements", False: END})
+        # graph.add_conditional_edges("orchestrator", self.to_update_requirements, {True: "update_requirements", False: END})
         graph.add_conditional_edges("orchestrator", self.to_expert, {True: "expert", False: END})
-        graph.add_conditional_edges("orchestrator", self.to_find_products, {True: "find_products", False: END})
+        graph.add_conditional_edges("orchestrator", self.to_find_products, {True: "update_requirements", False: END})
 
         graph.add_edge("expert", "orchestrator")
-        graph.add_edge("update_requirements", "orchestrator")
+        graph.add_edge("update_requirements", "find_products")
         graph.add_edge("find_products", "orchestrator")
 
         graph.set_entry_point("orchestrator")
@@ -97,7 +101,7 @@ class Agent:
         print(state)
         if self.orchestrator_system_prompt:
             messages = [SystemMessage(content=self.orchestrator_system_prompt)] + messages +  [SystemMessage(content= "updated user requirements are:" + str(state['requirements'].requirements)), SystemMessage(content= "a list of products that potentially meet user requirements are:" + str(state['candidates'].json()))]
-        model = self.model.bind_tools([tools['expert'], tools['update_requirements'], tools['find_products']])
+        model = self.model.bind_tools(tools.values())
         message = model.invoke(messages)
         return {'messages': [message]}
 
@@ -115,19 +119,18 @@ class Agent:
 
     def update_requirements(self, state: AgentState):
         print("Update requirements called!")
-        tool_calls = state['messages'][-1].tool_calls
-        results = []
-        for t in tool_calls:
-            if t['name'] == 'update_requirements':
-                results.append(ToolMessage(tool_call_id=t['id'], name=t['name'], content= "updated list of requirements" )) #+ str("\n".join(requirements.requirements))
+        # tool_calls = state['messages'][-1].tool_calls
+        # results = []
+        # for t in tool_calls:
+        #     if t['name'] == 'update_requirements':
+        #         results.append(ToolMessage(tool_call_id=t['id'], name=t['name'], content= "updated list of requirements" )) #+ str("\n".join(requirements.requirements))
 
         messages = state['messages']
         if self.update_req_system_prompt:
-            messages = [SystemMessage(content=self.update_req_system_prompt)] + messages + results
+            messages = [SystemMessage(content=self.update_req_system_prompt)] + messages[:-1]
         requirements = self.model.with_structured_output(Requirements).invoke(messages)
         print("Back to the model!")
-        return {'requirements': requirements,
-                'messages': results}
+        return {'requirements': requirements}
 
     def find_products(self, state: AgentState):
         print("Find products called!")
@@ -151,8 +154,8 @@ class Agent:
     def to_find_products(self, state: AgentState):
         return self.take_calls(state, 'find_products')
 
-    def to_update_requirements(self, state: AgentState):
-        return self.take_calls(state, 'update_requirements')
+    # def to_update_requirements(self, state: AgentState):
+    #     return self.take_calls(state, 'update_requirements')
 
     def take_calls(self, state: AgentState, tool_name):
         tool_calls = state['messages'][-1].tool_calls

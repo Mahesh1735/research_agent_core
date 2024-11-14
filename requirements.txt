@@ -1,0 +1,16 @@
+flask
+flask-cors
+langchain-core
+langchain-openai
+langgraph
+psycopg-pool
+python-dotenv
+tavily-python
+google-search-results
+requests
+pydantic
+langgraph-checkpoint-postgres
+langchain-community
+exa-py
+cohere
+gunicorn==21.2.0
