@@ -29,7 +29,7 @@ gpt_4o_model = ChatOpenAI(model="gpt-4o", openai_api_key=os.getenv('OPENAI_API_K
 gpt_4o_mini_model = ChatOpenAI(model="gpt-4o-mini", openai_api_key=os.getenv('OPENAI_API_KEY'))
 perplexity_model = ChatPerplexity(pplx_api_key=os.getenv('PERPLEXITY_API_KEY'), model="llama-3.1-sonar-large-128k-online")
 co = cohere.ClientV2(os.getenv('COHERE_API_KEY'))
-is_dev = os.getenv('IS_DEV') == 'true'
+is_dev = os.getenv('ENV') == 'dev'
 
 scraper_api_url = os.getenv("SCRAPER_API_URL")
 scraper = ScraperAPIWrapper(scraper_api_url)
